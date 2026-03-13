@@ -46,8 +46,11 @@ async def root() -> FileResponse:
 
 
 @app.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
+async def health() -> dict[str, object]:
+    from app.db.connection import get_session_factory
+
+    db_available = get_session_factory() is not None
+    return {"status": "ok", "db_available": db_available}
 
 
 # Mount static files AFTER explicit routes so that named routes take priority.

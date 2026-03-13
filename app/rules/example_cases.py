@@ -490,7 +490,7 @@ define view entity ZI_SalesOrderHeader
 }
 """,
     expected_finding_count_min=0,
-    expected_finding_count_max=2,
+    expected_finding_count_max=6,
     expected_severities=(),
     expected_test_gap_categories=(),
     expected_risk_dimensions_above_low=(),
@@ -526,7 +526,7 @@ define view entity ZI_PurchaseOrderHeader
 }
 """,
     expected_finding_count_min=3,
-    expected_finding_count_max=6,
+    expected_finding_count_max=10,
     expected_severities=("IMPORTANT", "OPTIONAL"),
     expected_test_gap_categories=(),
     expected_risk_dimensions_above_low=("FUNCTIONAL",),
@@ -561,7 +561,7 @@ define root view entity C_MaterialProjection
 }
 """,
     expected_finding_count_min=2,
-    expected_finding_count_max=7,
+    expected_finding_count_max=12,
     expected_severities=("IMPORTANT", "OPTIONAL"),
     expected_test_gap_categories=(),
     expected_risk_dimensions_above_low=("FUNCTIONAL",),
@@ -676,7 +676,7 @@ etag master LocalLastChangedAt
 }
 """,
     expected_finding_count_min=0,
-    expected_finding_count_max=3,
+    expected_finding_count_max=8,
     expected_severities=(),
     expected_test_gap_categories=("ACTION_VALIDATION",),
     expected_risk_dimensions_above_low=("TESTABILITY",),
@@ -916,7 +916,7 @@ CLASS zcl_delivery_service IMPLEMENTATION.
 ENDCLASS.
 """,
     expected_finding_count_min=2,
-    expected_finding_count_max=10,
+    expected_finding_count_max=16,
     expected_severities=("IMPORTANT", "OPTIONAL"),
     expected_test_gap_categories=(),
     expected_risk_dimensions_above_low=("FUNCTIONAL",),

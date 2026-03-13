@@ -55,6 +55,7 @@
       sapReleasePlaceholder: "z.B. S/4HANA 2023",
       ui5VersionPlaceholder: "z.B. 1.120",
       constraintsPlaceholder: "Einschraenkung eingeben, Enter druecken",
+      designInputPlaceholder: "Fuegen Sie hier Ihre Loesungsbeschreibung ein...\n\nBeispiel:\nWir planen eine Custom Fiori App fuer die Auftragsbearbeitung.\nDie App nutzt OData V4 mit RAP Managed Szenario.\nEntitaeten: Auftrag, Auftragsposition, Kunde.",
 
       // Review Type options
       rt_snippet: "Snippet Review",
@@ -154,7 +155,31 @@
       "oq.answerPlaceholder": "Ihre Antwort...",
       "oq.answerAriaPrefix": "Antwort fuer: ",
       "oq.regenerateBtn": "Review mit Antworten erneut ausfuehren",
-      "oq.answeredCount": "{n} beantwortet"
+      "oq.answeredCount": "{n} beantwortet",
+
+      // History
+      historyTitle: "Verlauf",
+      historyEmpty: "Noch keine Reviews gespeichert.",
+      historyClearAll: "Alle loeschen",
+      historyToggleTitle: "Verlauf anzeigen",
+      historyDeleteConfirm: "Diesen Eintrag wirklich loeschen?",
+      historyClearConfirm: "Gesamten Verlauf wirklich loeschen?",
+      historyFindings: "Befunde",
+
+      // Feedback
+      feedbackLabel: "Hilfreich?",
+      feedbackUp: "Ja",
+      feedbackDown: "Nein",
+
+      // Export
+      exportMarkdown: "Markdown exportieren",
+      copyTicketComment: "Als Ticket-Kommentar kopieren",
+      copyClipboard: "In Zwischenablage kopieren",
+      copiedToClipboard: "In die Zwischenablage kopiert",
+      markdownDownloaded: "Markdown-Datei heruntergeladen",
+
+      // Finding expansion
+      lineRef: "Zeile"
     },
     en: {
       // Header
@@ -202,6 +227,7 @@
       sapReleasePlaceholder: "e.g. S/4HANA 2023",
       ui5VersionPlaceholder: "e.g. 1.120",
       constraintsPlaceholder: "Type constraint, press Enter",
+      designInputPlaceholder: "Paste your solution design description here...\n\nExample:\nWe plan to build a custom Fiori app for sales order management.\nThe app will use OData V4 with RAP managed scenario.\nEntities: SalesOrder, SalesOrderItem, Customer.",
 
       // Review Type options
       rt_snippet: "Snippet Review",
@@ -301,13 +327,41 @@
       "oq.answerPlaceholder": "Your answer...",
       "oq.answerAriaPrefix": "Answer for: ",
       "oq.regenerateBtn": "Re-run Review with Answers",
-      "oq.answeredCount": "{n} answered"
+      "oq.answeredCount": "{n} answered",
+
+      // History
+      historyTitle: "History",
+      historyEmpty: "No reviews saved yet.",
+      historyClearAll: "Clear All",
+      historyToggleTitle: "Toggle history panel",
+      historyDeleteConfirm: "Really delete this entry?",
+      historyClearConfirm: "Really clear all history?",
+      historyFindings: "Findings",
+
+      // Feedback
+      feedbackLabel: "Helpful?",
+      feedbackUp: "Yes",
+      feedbackDown: "No",
+
+      // Export
+      exportMarkdown: "Export Markdown",
+      copyTicketComment: "Copy as Ticket Comment",
+      copyClipboard: "Copy to Clipboard",
+      copiedToClipboard: "Copied to clipboard",
+      markdownDownloaded: "Markdown file downloaded",
+
+      // Finding expansion
+      lineRef: "Line"
     }
   };
 
   var currentLang = "de";
   var clarifications = {};
   var lastPayload = null;
+  var lastResponse = null;
+  var dbAvailable = false;
+  var currentReviewId = null;
+  var feedbackState = {}; // { "reviewId-findingIndex": true/false }
 
   function t(key) {
     var dict = TRANSLATIONS[currentLang] || TRANSLATIONS.de;
@@ -329,6 +383,12 @@
   var advancedToggle = document.getElementById("advancedToggle");
   var advancedBody = document.getElementById("advancedBody");
   var btnDismissError = document.getElementById("btnDismissError");
+  var historyToggle = document.getElementById("historyToggle");
+  var historyPanel = document.getElementById("historyPanel");
+  var historyList = document.getElementById("historyList");
+  var historyEmpty = document.getElementById("historyEmpty");
+  var historyCloseBtn = document.getElementById("historyCloseBtn");
+  var btnClearHistory = document.getElementById("btnClearHistory");
 
   // -----------------------------------------------------------------------
   // Tag Input Data
@@ -412,6 +472,23 @@
   });
 
   initLanguage();
+
+  // -----------------------------------------------------------------------
+  // Dynamic placeholder for Solution Design Review
+  // -----------------------------------------------------------------------
+  (function () {
+    var reviewTypeEl = document.getElementById("reviewType");
+    var codeInputEl = document.getElementById("codeInput");
+    if (reviewTypeEl && codeInputEl) {
+      reviewTypeEl.addEventListener("change", function () {
+        if (reviewTypeEl.value === "SOLUTION_DESIGN_REVIEW") {
+          codeInputEl.placeholder = t("designInputPlaceholder");
+        } else {
+          codeInputEl.placeholder = t("codeInputPlaceholder");
+        }
+      });
+    }
+  })();
 
   // -----------------------------------------------------------------------
   // Collapsible: Advanced Options
@@ -626,7 +703,9 @@
         return resp.json();
       })
       .then(function (data) {
+        currentReviewId = data._history_id || null;
         renderResults(data);
+        if (dbAvailable) loadHistory();
       })
       .catch(function (err) {
         errorMessage.textContent = err.message || t("unknownError");
@@ -645,6 +724,7 @@
   // -----------------------------------------------------------------------
   function renderResults(data) {
     loadingState.hidden = true;
+    lastResponse = data;
 
     // 1. Overall Assessment
     renderOverallAssessment(data.overall_assessment);
@@ -741,9 +821,14 @@
     var container = document.createElement("div");
     container.className = "findings-list";
 
-    findings.forEach(function (f) {
+    findings.forEach(function (f, idx) {
       var item = document.createElement("div");
       item.className = "finding-item finding-item--" + (f.severity || "UNCLEAR");
+
+      // First 3 findings start expanded
+      if (idx < 3) {
+        item.classList.add("is-expanded");
+      }
 
       var header = document.createElement("div");
       header.className = "finding-header";
@@ -759,6 +844,17 @@
       title.className = "finding-title";
       title.textContent = f.title || "Finding";
 
+      header.appendChild(badge);
+      header.appendChild(title);
+
+      // Line reference badge (visible in header)
+      if (f.line_reference) {
+        var lineRef = document.createElement("span");
+        lineRef.className = "finding-line-ref";
+        lineRef.textContent = t("lineRef") + " " + f.line_reference;
+        header.appendChild(lineRef);
+      }
+
       var expandIcon = document.createElement("svg");
       expandIcon.className = "finding-expand-icon";
       expandIcon.setAttribute("width", "12");
@@ -769,8 +865,6 @@
       expandIcon.setAttribute("stroke-width", "2");
       expandIcon.innerHTML = '<polyline points="6 9 12 15 18 9"/>';
 
-      header.appendChild(badge);
-      header.appendChild(title);
       header.appendChild(expandIcon);
 
       var details = document.createElement("div");
@@ -802,6 +896,50 @@
         if (f.line_reference) parts.push("Line: " + f.line_reference);
         ref.textContent = parts.join(" | ");
         details.appendChild(ref);
+      }
+
+      // Feedback buttons (only if DB is available)
+      if (dbAvailable && currentReviewId) {
+        var fbRow = document.createElement("div");
+        fbRow.className = "finding-feedback";
+        fbRow.setAttribute("data-finding-index", idx);
+
+        var fbLabel = document.createElement("span");
+        fbLabel.className = "feedback-label";
+        fbLabel.textContent = t("feedbackLabel");
+        fbRow.appendChild(fbLabel);
+
+        var fbKey = currentReviewId + "-" + idx;
+        var btnUp = document.createElement("button");
+        btnUp.type = "button";
+        btnUp.className = "feedback-btn feedback-btn--up" + (feedbackState[fbKey] === true ? " active" : "");
+        btnUp.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg> ' + escapeHtml(t("feedbackUp"));
+
+        var btnDown = document.createElement("button");
+        btnDown.type = "button";
+        btnDown.className = "feedback-btn feedback-btn--down" + (feedbackState[fbKey] === false ? " active" : "");
+        btnDown.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/><path d="M17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/></svg> ' + escapeHtml(t("feedbackDown"));
+
+        (function (upBtn, downBtn, findingIdx, ruleId, key) {
+          upBtn.onclick = function (e) {
+            e.stopPropagation();
+            submitFeedback(currentReviewId, findingIdx, ruleId, true);
+            feedbackState[key] = true;
+            upBtn.classList.add("active");
+            downBtn.classList.remove("active");
+          };
+          downBtn.onclick = function (e) {
+            e.stopPropagation();
+            submitFeedback(currentReviewId, findingIdx, ruleId, false);
+            feedbackState[key] = false;
+            downBtn.classList.add("active");
+            upBtn.classList.remove("active");
+          };
+        })(btnUp, btnDown, idx, f.rule_id || null, fbKey);
+
+        fbRow.appendChild(btnUp);
+        fbRow.appendChild(btnDown);
+        details.appendChild(fbRow);
       }
 
       item.appendChild(header);
@@ -861,8 +999,10 @@
         return resp.json();
       })
       .then(function (data) {
+        currentReviewId = data._history_id || null;
         renderResults(data);
         resultsContainer.hidden = false;
+        if (dbAvailable) loadHistory();
 
         // Ensure open questions card is expanded after re-generate
         var oqHeader = document.querySelector('#cardOpenQuestions .result-card-header');
@@ -1106,6 +1246,9 @@
         html += '<div class="risk-card-mitigation">' + escapeHtml(t("mitigation")) + ': ' + escapeHtml(r.mitigation) + '</div>';
       }
 
+      // Risk bar indicator
+      html += '<div class="risk-bar"><div class="risk-bar-fill"></div></div>';
+
       card.innerHTML = html;
       container.appendChild(card);
     });
@@ -1219,6 +1362,461 @@
         .catch(function () {
           // Silently ignore
         });
+    });
+  }
+
+  // -----------------------------------------------------------------------
+  // DB availability check & History initialization
+  // -----------------------------------------------------------------------
+  function checkDbAvailability() {
+    fetch("/api/health")
+      .then(function (resp) { return resp.json(); })
+      .then(function (data) {
+        dbAvailable = !!data.db_available;
+        if (dbAvailable) {
+          historyToggle.hidden = false;
+          loadHistory();
+        } else {
+          historyToggle.hidden = true;
+          historyPanel.hidden = true;
+        }
+      })
+      .catch(function () {
+        dbAvailable = false;
+        historyToggle.hidden = true;
+      });
+  }
+
+  checkDbAvailability();
+
+  // -----------------------------------------------------------------------
+  // History Panel Toggle
+  // -----------------------------------------------------------------------
+  historyToggle.addEventListener("click", function () {
+    var isOpen = !historyPanel.hidden;
+    historyPanel.hidden = isOpen;
+    historyToggle.classList.toggle("is-active", !isOpen);
+    if (!isOpen) loadHistory();
+  });
+
+  historyCloseBtn.addEventListener("click", function () {
+    historyPanel.hidden = true;
+    historyToggle.classList.remove("is-active");
+  });
+
+  // -----------------------------------------------------------------------
+  // History CRUD
+  // -----------------------------------------------------------------------
+  function loadHistory() {
+    fetch("/api/history?limit=50")
+      .then(function (resp) { return resp.json(); })
+      .then(function (entries) {
+        renderHistoryList(entries || []);
+      })
+      .catch(function () {
+        renderHistoryList([]);
+      });
+  }
+
+  function renderHistoryList(entries) {
+    // Clear all entries except the empty message
+    var children = historyList.children;
+    for (var i = children.length - 1; i >= 0; i--) {
+      if (children[i] !== historyEmpty) {
+        historyList.removeChild(children[i]);
+      }
+    }
+
+    if (entries.length === 0) {
+      historyEmpty.hidden = false;
+      return;
+    }
+
+    historyEmpty.hidden = true;
+
+    entries.forEach(function (entry) {
+      var el = document.createElement("div");
+      el.className = "history-entry";
+      el.setAttribute("data-review-id", entry.id);
+
+      var date = new Date(entry.created_at);
+      var dateStr = date.toLocaleDateString(currentLang === "de" ? "de-DE" : "en-US", {
+        day: "2-digit", month: "2-digit", year: "numeric",
+        hour: "2-digit", minute: "2-digit"
+      });
+
+      var assessClass = "history-assessment-badge--" + (entry.overall_assessment || "GO");
+      var assessLabel = entry.overall_assessment || "GO";
+      if (assessLabel === "CONDITIONAL_GO") assessLabel = "COND.";
+
+      var artifactLabel = (entry.artifact_type || "").replace(/_/g, " ");
+
+      el.innerHTML =
+        '<div class="history-entry-top">' +
+          '<span class="history-entry-date">' + escapeHtml(dateStr) + '</span>' +
+          '<span class="history-entry-badge ' + assessClass + '">' + escapeHtml(assessLabel) + '</span>' +
+        '</div>' +
+        '<div class="history-entry-meta">' +
+          '<span class="history-artifact-badge">' + escapeHtml(artifactLabel) + '</span>' +
+          '<span class="history-finding-count">' + (entry.finding_count || 0) + ' ' + escapeHtml(t("historyFindings")) + '</span>' +
+        '</div>' +
+        '<div class="history-entry-actions">' +
+          '<button type="button" class="history-delete-btn" data-delete-id="' + escapeHtml(entry.id) + '">' +
+            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>' +
+          '</button>' +
+        '</div>';
+
+      // Click on entry loads the review
+      el.addEventListener("click", function (e) {
+        if (e.target.closest(".history-delete-btn")) return;
+        loadHistoryEntry(entry.id);
+      });
+
+      // Delete button
+      var delBtn = el.querySelector(".history-delete-btn");
+      if (delBtn) {
+        delBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          deleteHistoryEntry(entry.id);
+        });
+      }
+
+      historyList.appendChild(el);
+    });
+  }
+
+  function loadHistoryEntry(id) {
+    fetch("/api/history/" + encodeURIComponent(id))
+      .then(function (resp) {
+        if (!resp.ok) throw new Error("Not found");
+        return resp.json();
+      })
+      .then(function (data) {
+        if (data.full_response) {
+          currentReviewId = id;
+          // Load any existing feedback for this review
+          loadFeedbackForReview(id, function () {
+            renderResults(data.full_response);
+            resultsContainer.hidden = false;
+            placeholder.hidden = true;
+            errorState.hidden = true;
+          });
+        }
+      })
+      .catch(function () {
+        // Silently ignore
+      });
+  }
+
+  function deleteHistoryEntry(id) {
+    if (!confirm(t("historyDeleteConfirm"))) return;
+
+    fetch("/api/history/" + encodeURIComponent(id), { method: "DELETE" })
+      .then(function () {
+        loadHistory();
+      })
+      .catch(function () {
+        // Silently ignore
+      });
+  }
+
+  btnClearHistory.addEventListener("click", function () {
+    if (!confirm(t("historyClearConfirm"))) return;
+
+    fetch("/api/history", { method: "DELETE" })
+      .then(function () {
+        loadHistory();
+      })
+      .catch(function () {
+        // Silently ignore
+      });
+  });
+
+  // -----------------------------------------------------------------------
+  // Feedback
+  // -----------------------------------------------------------------------
+  function submitFeedback(reviewId, findingIndex, ruleId, helpful) {
+    fetch("/api/review/" + encodeURIComponent(reviewId) + "/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        finding_index: findingIndex,
+        rule_id: ruleId,
+        helpful: helpful
+      })
+    }).catch(function () {
+      // Silently ignore - feedback is best-effort
+    });
+  }
+
+  function loadFeedbackForReview(reviewId, callback) {
+    fetch("/api/review/" + encodeURIComponent(reviewId) + "/feedback")
+      .then(function (resp) { return resp.json(); })
+      .then(function (feedbacks) {
+        // Reset feedback state for this review
+        (feedbacks || []).forEach(function (fb) {
+          var key = reviewId + "-" + fb.finding_index;
+          feedbackState[key] = fb.helpful;
+        });
+        if (callback) callback();
+      })
+      .catch(function () {
+        if (callback) callback();
+      });
+  }
+
+  // -----------------------------------------------------------------------
+  // Export: Client-side formatters
+  // -----------------------------------------------------------------------
+  function formatAsMarkdown(response) {
+    var isDE = currentLang === "de";
+    var lines = [];
+
+    lines.push("# " + (isDE ? "Review-Bericht" : "Review Report"));
+    lines.push("");
+
+    var assessment = response.overall_assessment || {};
+    if (assessment.go_no_go) {
+      lines.push("## " + (isDE ? "Gesamtbewertung" : "Overall Assessment"));
+      lines.push("");
+      var verdictMap = { GO: "GO", CONDITIONAL_GO: "CONDITIONAL GO", NO_GO: "NO-GO" };
+      var verdict = verdictMap[assessment.go_no_go] || assessment.go_no_go;
+      var confLabel = isDE ? "Konfidenz" : "Confidence";
+      lines.push("**" + verdict + "**" + (assessment.confidence ? " (" + confLabel + ": " + assessment.confidence + ")" : ""));
+      lines.push("");
+      if (assessment.summary) { lines.push(assessment.summary); lines.push(""); }
+      var counts = [];
+      if (assessment.critical_count) counts.push(assessment.critical_count + " Critical");
+      if (assessment.important_count) counts.push(assessment.important_count + " Important");
+      if (assessment.optional_count) counts.push(assessment.optional_count + " Optional");
+      if (counts.length) { lines.push(counts.join(" | ")); lines.push(""); }
+    }
+
+    if (response.review_summary) {
+      lines.push("## " + (isDE ? "Zusammenfassung" : "Summary"));
+      lines.push("");
+      lines.push(response.review_summary);
+      lines.push("");
+    }
+
+    var findings = response.findings || [];
+    if (findings.length) {
+      lines.push("## " + (isDE ? "Befunde" : "Findings"));
+      lines.push("");
+      lines.push(isDE ? "| # | Schweregrad | Titel | Empfehlung |" : "| # | Severity | Title | Recommendation |");
+      lines.push("|---|-----------|-------|--------------|");
+      findings.forEach(function (f, i) {
+        var rec = (f.recommendation || "").replace(/\|/g, "\\|");
+        if (rec.length > 120) rec = rec.substring(0, 117) + "...";
+        lines.push("| " + (i + 1) + " | " + (f.severity || "") + " | " + (f.title || "").replace(/\|/g, "\\|") + " | " + rec + " |");
+      });
+      lines.push("");
+      findings.forEach(function (f, i) {
+        lines.push("### " + (i + 1) + ". [" + (f.severity || "") + "] " + (f.title || ""));
+        lines.push("");
+        if (f.observation) { lines.push("**" + (isDE ? "Beobachtung" : "Observation") + ":** " + f.observation); lines.push(""); }
+        if (f.reasoning) { lines.push("**" + (isDE ? "Begruendung" : "Reasoning") + ":** " + f.reasoning); lines.push(""); }
+        if (f.impact) { lines.push("**" + (isDE ? "Auswirkung" : "Impact") + ":** " + f.impact); lines.push(""); }
+        if (f.recommendation) { lines.push("**" + (isDE ? "Empfehlung" : "Recommendation") + ":** " + f.recommendation); lines.push(""); }
+        var refs = [];
+        if (f.rule_id) refs.push("Rule: " + f.rule_id);
+        if (f.line_reference) refs.push("Line: " + f.line_reference);
+        if (refs.length) { lines.push("_" + refs.join(" | ") + "_"); lines.push(""); }
+      });
+    }
+
+    var testGaps = response.test_gaps || [];
+    if (testGaps.length) {
+      lines.push("## " + (isDE ? "Testluecken" : "Test Gaps"));
+      lines.push("");
+      testGaps.forEach(function (g) {
+        lines.push("- **[" + (g.priority || "") + "]** " + (g.category || "") + ": " + (g.description || ""));
+        if (g.suggested_test) lines.push("  - " + g.suggested_test);
+      });
+      lines.push("");
+    }
+
+    var risks = response.risk_notes || [];
+    if (risks.length) {
+      lines.push("## " + (isDE ? "Risiko-Dashboard" : "Risk Dashboard"));
+      lines.push("");
+      risks.forEach(function (r) {
+        lines.push("- **" + (r.category || "") + "** [" + (r.severity || "") + "]: " + (r.description || ""));
+        if (r.mitigation) lines.push("  - " + (isDE ? "Massnahme" : "Mitigation") + ": " + r.mitigation);
+      });
+      lines.push("");
+    }
+
+    var actions = response.recommended_actions || [];
+    if (actions.length) {
+      lines.push("## " + (isDE ? "Empfohlene Massnahmen" : "Recommended Actions"));
+      lines.push("");
+      actions.forEach(function (a) {
+        var effort = a.effort_hint ? " [" + a.effort_hint + "]" : "";
+        lines.push((a.order || "") + ". **" + (a.title || "") + "**" + effort);
+        if (a.description) lines.push("   " + a.description);
+      });
+      lines.push("");
+    }
+
+    return lines.join("\n");
+  }
+
+  function formatAsTicketComment(response) {
+    var isDE = currentLang === "de";
+    var lines = [];
+
+    var assessment = response.overall_assessment || {};
+    var verdictMap = { GO: "GO", CONDITIONAL_GO: "CONDITIONAL GO", NO_GO: "NO-GO" };
+    var verdict = verdictMap[assessment.go_no_go] || assessment.go_no_go || "GO";
+    lines.push("[" + verdict + "] " + (isDE ? "Code-Review Ergebnis" : "Code Review Result"));
+    lines.push("");
+    if (assessment.summary) { lines.push(assessment.summary); lines.push(""); }
+
+    var findings = response.findings || [];
+    if (findings.length) {
+      lines.push(isDE ? "Befunde:" : "Findings:");
+      findings.slice(0, 5).forEach(function (f) {
+        var rec = (f.recommendation || "");
+        if (rec.length > 80) rec = rec.substring(0, 77) + "...";
+        lines.push("- [" + (f.severity || "") + "] " + (f.title || ""));
+        if (rec) lines.push("  -> " + rec);
+      });
+      if (findings.length > 5) {
+        lines.push("  (+" + (findings.length - 5) + " " + (isDE ? "weitere" : "more") + ")");
+      }
+      lines.push("");
+    }
+
+    var actions = response.recommended_actions || [];
+    if (actions.length) {
+      lines.push(isDE ? "Naechste Schritte:" : "Next Steps:");
+      actions.slice(0, 3).forEach(function (a) { lines.push("- " + (a.title || "")); });
+      lines.push("");
+    }
+
+    return lines.join("\n");
+  }
+
+  function formatAsClipboard(response) {
+    var isDE = currentLang === "de";
+    var lines = [];
+
+    var assessment = response.overall_assessment || {};
+    var verdictMap = { GO: "GO", CONDITIONAL_GO: "CONDITIONAL GO", NO_GO: "NO-GO" };
+    var verdict = verdictMap[assessment.go_no_go] || assessment.go_no_go || "GO";
+    var line = verdict;
+    if (assessment.confidence) line += " (" + assessment.confidence + ")";
+    if (assessment.summary) line += " - " + assessment.summary;
+    lines.push(line);
+    lines.push("");
+
+    var findings = response.findings || [];
+    if (findings.length) {
+      lines.push(isDE ? "Befunde:" : "Findings:");
+      findings.forEach(function (f) {
+        lines.push("  [" + (f.severity || "") + "] " + (f.title || ""));
+      });
+      lines.push("");
+    }
+
+    var actions = response.recommended_actions || [];
+    if (actions.length) {
+      lines.push(isDE ? "Massnahmen:" : "Actions:");
+      actions.forEach(function (a) {
+        lines.push("  " + (a.order || "") + ". " + (a.title || ""));
+      });
+      lines.push("");
+    }
+
+    return lines.join("\n");
+  }
+
+  function downloadAsFile(content, filename, mimeType) {
+    var blob = new Blob([content], { type: mimeType });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+  }
+
+  function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        showToast(t("copiedToClipboard"));
+      }).catch(function () {
+        fallbackCopy(text);
+      });
+    } else {
+      fallbackCopy(text);
+    }
+  }
+
+  function fallbackCopy(text) {
+    var textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand("copy");
+      showToast(t("copiedToClipboard"));
+    } catch (e) {
+      // Silently ignore
+    }
+    document.body.removeChild(textarea);
+  }
+
+  function showToast(message) {
+    var existing = document.querySelector(".toast-notification");
+    if (existing) existing.parentNode.removeChild(existing);
+
+    var toast = document.createElement("div");
+    toast.className = "toast-notification";
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(function () {
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 3000);
+  }
+
+  // -----------------------------------------------------------------------
+  // Export Button Handlers
+  // -----------------------------------------------------------------------
+  var btnExportMarkdown = document.getElementById("btnExportMarkdown");
+  var btnCopyTicket = document.getElementById("btnCopyTicket");
+  var btnCopyClipboard = document.getElementById("btnCopyClipboard");
+
+  if (btnExportMarkdown) {
+    btnExportMarkdown.addEventListener("click", function () {
+      if (!lastResponse) return;
+      var md = formatAsMarkdown(lastResponse);
+      var filename = "review-" + new Date().toISOString().slice(0, 10) + ".md";
+      downloadAsFile(md, filename, "text/markdown");
+      showToast(t("markdownDownloaded"));
+    });
+  }
+
+  if (btnCopyTicket) {
+    btnCopyTicket.addEventListener("click", function () {
+      if (!lastResponse) return;
+      var text = formatAsTicketComment(lastResponse);
+      copyToClipboard(text);
+    });
+  }
+
+  if (btnCopyClipboard) {
+    btnCopyClipboard.addEventListener("click", function () {
+      if (!lastResponse) return;
+      var text = formatAsClipboard(lastResponse);
+      copyToClipboard(text);
     });
   }
 

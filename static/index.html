@@ -33,6 +33,9 @@
     </div>
     <div class="header-actions">
       <span class="version-badge">v0.1.0 MVP</span>
+      <button class="history-toggle" id="historyToggle" type="button" aria-label="Toggle history panel" title="Toggle history panel" data-i18n-title="historyToggleTitle" hidden>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </button>
       <button class="lang-toggle" id="langToggle" type="button" aria-label="Toggle language" title="Toggle language">DE</button>
       <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark/light mode" title="Toggle dark/light mode">
         <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
@@ -339,6 +342,22 @@
       <!-- Results Container -->
       <div id="resultsContainer" class="results-container" hidden>
 
+        <!-- Export Actions -->
+        <div class="export-actions" id="exportActions">
+          <button type="button" class="btn-export" id="btnExportMarkdown" data-i18n="exportMarkdown">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export Markdown
+          </button>
+          <button type="button" class="btn-export" id="btnCopyTicket" data-i18n="copyTicketComment">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy as Ticket Comment
+          </button>
+          <button type="button" class="btn-export" id="btnCopyClipboard" data-i18n="copyClipboard">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+            Copy to Clipboard
+          </button>
+        </div>
+
         <!-- 1. Overall Assessment -->
         <article class="result-card" id="cardOverallAssessment">
           <button type="button" class="result-card-header" aria-expanded="true" data-target="cardOverallAssessmentBody">
@@ -422,6 +441,22 @@
 
       </div>
     </section>
+
+    <!-- History Panel (sidebar) -->
+    <aside class="history-panel" id="historyPanel" role="complementary" aria-label="Review history" hidden>
+      <div class="history-panel-header">
+        <h2 class="history-panel-title" data-i18n="historyTitle">Verlauf</h2>
+        <button type="button" class="history-close-btn" id="historyCloseBtn" aria-label="Close history" title="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="history-list" id="historyList">
+        <p class="history-empty" id="historyEmpty" data-i18n="historyEmpty">Noch keine Reviews gespeichert.</p>
+      </div>
+      <div class="history-panel-footer">
+        <button type="button" class="btn-clear-history" id="btnClearHistory" data-i18n="historyClearAll">Alle loeschen</button>
+      </div>
+    </aside>
   </main>
 
   <!-- Screen Reader Live Region -->

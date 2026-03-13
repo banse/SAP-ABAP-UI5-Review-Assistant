@@ -12,9 +12,23 @@ from typing import Any, Callable
 from app.models.enums import ArtifactType, Language, ReviewContext, ReviewType, Severity
 from app.models.schemas import Finding
 from app.rules.abap_basic import ABAP_CHECK_FUNCTIONS, ABAP_RULES
+from app.rules.abap_error_handling import (
+    ABAP_ERROR_HANDLING_CHECK_FUNCTIONS,
+    ABAP_ERROR_HANDLING_RULES,
+)
+from app.rules.abap_readability import (
+    ABAP_READABILITY_CHECK_FUNCTIONS,
+    ABAP_READABILITY_RULES,
+)
 from app.rules.base_rules import ReviewRule, RuleMatch
+from app.rules.cds_annotation import CDS_ANNOTATION_CHECK_FUNCTIONS, CDS_ANNOTATION_RULES
+from app.rules.domains import DOMAIN_CHECK_FUNCTIONS, DOMAIN_RULES
 from app.rules.cds_basic import CDS_CHECK_FUNCTIONS, CDS_RULES
+from app.rules.fiori_elements import FIORI_ELEMENTS_CHECK_FUNCTIONS, FIORI_ELEMENTS_RULES
+from app.rules.rap_consistency import RAP_CONSISTENCY_CHECK_FUNCTIONS, RAP_CONSISTENCY_RULES
 from app.rules.ui5_basic import UI5_CHECK_FUNCTIONS, UI5_RULES
+from app.rules.service_odata import SERVICE_ODATA_CHECK_FUNCTIONS, SERVICE_ODATA_RULES
+from app.rules.ui5_freestyle import UI5_FREESTYLE_CHECK_FUNCTIONS, UI5_FREESTYLE_RULES
 
 # ---------------------------------------------------------------------------
 # Severity ordering (for sorting: CRITICAL first)
@@ -31,12 +45,26 @@ _SEVERITY_ORDER: dict[str, int] = {
 # Combined registries
 # ---------------------------------------------------------------------------
 
-ALL_RULES: tuple[ReviewRule, ...] = ABAP_RULES + CDS_RULES + UI5_RULES
+ALL_RULES: tuple[ReviewRule, ...] = (
+    ABAP_RULES + ABAP_READABILITY_RULES + ABAP_ERROR_HANDLING_RULES
+    + CDS_RULES + CDS_ANNOTATION_RULES + RAP_CONSISTENCY_RULES
+    + UI5_RULES + UI5_FREESTYLE_RULES + FIORI_ELEMENTS_RULES
+    + SERVICE_ODATA_RULES
+    + DOMAIN_RULES
+)
 
 ALL_CHECK_FUNCTIONS: dict[str, Any] = {
     **ABAP_CHECK_FUNCTIONS,
+    **ABAP_READABILITY_CHECK_FUNCTIONS,
+    **ABAP_ERROR_HANDLING_CHECK_FUNCTIONS,
     **CDS_CHECK_FUNCTIONS,
+    **CDS_ANNOTATION_CHECK_FUNCTIONS,
+    **RAP_CONSISTENCY_CHECK_FUNCTIONS,
     **UI5_CHECK_FUNCTIONS,
+    **UI5_FREESTYLE_CHECK_FUNCTIONS,
+    **FIORI_ELEMENTS_CHECK_FUNCTIONS,
+    **SERVICE_ODATA_CHECK_FUNCTIONS,
+    **DOMAIN_CHECK_FUNCTIONS,
 }
 
 

@@ -10,6 +10,7 @@ from app.engines.action_engine import generate_actions
 from app.engines.artifact_classifier import classify_artifact
 from app.engines.assessment_engine import generate_assessment
 from app.engines.clean_core_checker import check_clean_core
+from app.engines.design_reviewer import run_design_review
 from app.engines.findings_engine import run_findings_engine
 from app.engines.question_engine import generate_questions
 from app.engines.refactoring_engine import generate_refactoring_hints
@@ -127,29 +128,43 @@ def run_review_pipeline(request: ReviewRequest) -> ReviewResponse:
                 + "\n".join(enrichment_lines)
             )
 
-    # Step 4 -- Run findings engine
-    findings = run_findings_engine(
-        code=enriched_code,
-        artifact_type=artifact_type,
-        review_type=review_type,
-        review_context=request.review_context,
-        language=language,
-    )
+    # Step 4 -- Run findings engine (or design reviewer for design reviews)
+    is_design_review = review_type == ReviewType.SOLUTION_DESIGN_REVIEW
 
-    # Step 5 -- Run test-gap analyzer
-    test_gaps = analyze_test_gaps(
-        code=enriched_code,
-        artifact_type=artifact_type,
-        review_context=request.review_context,
-        language=language,
-    )
+    if is_design_review:
+        findings = run_design_review(
+            code=enriched_code,
+            language=language,
+        )
+    else:
+        findings = run_findings_engine(
+            code=enriched_code,
+            artifact_type=artifact_type,
+            review_type=review_type,
+            review_context=request.review_context,
+            language=language,
+        )
 
-    # Step 6 -- Run clean-core checker
-    clean_core_hints = check_clean_core(
-        code=enriched_code,
-        artifact_type=artifact_type,
-        language=language,
-    )
+    # Step 5 -- Run test-gap analyzer (skip for design reviews)
+    if is_design_review:
+        test_gaps = []
+    else:
+        test_gaps = analyze_test_gaps(
+            code=enriched_code,
+            artifact_type=artifact_type,
+            review_context=request.review_context,
+            language=language,
+        )
+
+    # Step 6 -- Run clean-core checker (skip for design reviews)
+    if is_design_review:
+        clean_core_hints = []
+    else:
+        clean_core_hints = check_clean_core(
+            code=enriched_code,
+            artifact_type=artifact_type,
+            language=language,
+        )
 
     # Step 7 -- Run risk engine
     risk_notes = assess_risks(

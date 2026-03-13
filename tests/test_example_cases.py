@@ -339,7 +339,7 @@ class TestCDSCleanView:
 
     def test_few_findings(self) -> None:
         result = _run_case(EXAMPLE_CASES_BY_ID["cds_clean_view"])
-        assert len(result.findings) <= 2
+        assert len(result.findings) <= 6
 
 
 class TestCDSMissingAnnotations:

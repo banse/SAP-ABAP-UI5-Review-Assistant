@@ -905,7 +905,7 @@ class TestEngineEdgeCases:
         findings = _run(code)
         for f in findings:
             if f.rule_id:
-                assert f.rule_id.startswith(("ABAP-", "CDS-", "UI5-"))
+                assert f.rule_id.startswith(("ABAP-", "CDS-", "UI5-", "DOM-", "RAP-", "FE-", "SVC-"))
 
     def test_findings_have_line_reference(self) -> None:
         code = "SELECT * FROM vbak INTO TABLE @lt_orders WHERE kunnr = @iv_kunnr.\n"
