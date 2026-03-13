@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SAP ABAP/UI5 Review Assistant</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-brand">
+      <span class="header-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="5" height="5" rx="1" fill="currentColor" opacity="0.9"/><rect x="8" y="1" width="5" height="5" rx="1" fill="currentColor" opacity="0.6"/><rect x="15" y="1" width="4" height="5" rx="1" fill="currentColor" opacity="0.3"/><rect x="1" y="8" width="5" height="5" rx="1" fill="currentColor" opacity="0.6"/><rect x="8" y="8" width="5" height="5" rx="1" fill="currentColor" opacity="0.9"/><rect x="15" y="8" width="4" height="5" rx="1" fill="currentColor" opacity="0.6"/><rect x="1" y="15" width="5" height="4" rx="1" fill="currentColor" opacity="0.3"/><rect x="8" y="15" width="5" height="4" rx="1" fill="currentColor" opacity="0.6"/><rect x="15" y="15" width="4" height="4" rx="1" fill="currentColor" opacity="0.9"/></svg></span>
+      <h1>SAP ABAP/UI5 Review Assistant</h1>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span class="header-subtitle">Code Review Tool</span>
+      <span class="version-badge">v0.1.0</span>
+      <button type="button" class="lang-toggle" id="langToggle" aria-label="Sprache wechseln / Toggle language" title="Sprache wechseln / Toggle language">DE</button>
+      <button type="button" class="theme-toggle" id="themeToggle" aria-label="Farbschema wechseln" title="Farbschema wechseln">
+        <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="split-layout">
+    <!-- LEFT: Input Form -->
+    <aside class="panel-left">
+      <form id="reviewForm" autocomplete="off">
+        <section class="form-section">
+          <label for="codeInput" class="form-label" data-i18n="codeInput">Code / Artefakt</label>
+          <textarea
+            id="codeInput"
+            name="code"
+            rows="12"
+            class="form-textarea form-textarea--code"
+            data-i18n-placeholder="codeInputPlaceholder"
+            placeholder="ABAP-Code, CDS-View, UI5-XML-View oder Controller hier einfuegen..."
+            required
+          ></textarea>
+        </section>
+
+        <section class="form-section">
+          <label for="objectType" class="form-label" data-i18n="objectType">Objekttyp</label>
+          <select id="objectType" name="object_type" class="form-select">
+            <option value="auto" data-i18n="autoDetect">Automatisch erkennen</option>
+            <option value="abap_class">ABAP Class</option>
+            <option value="abap_report">ABAP Report</option>
+            <option value="cds_view">CDS View</option>
+            <option value="rap_behavior">RAP Behavior Definition</option>
+            <option value="ui5_xml_view">UI5 XML View</option>
+            <option value="ui5_controller">UI5 Controller</option>
+            <option value="ui5_fragment">UI5 Fragment</option>
+          </select>
+        </section>
+
+        <section class="form-section">
+          <label class="form-label" data-i18n="reviewCategories">Review-Kategorien</label>
+          <div class="checkbox-group">
+            <label class="checkbox-item">
+              <input type="checkbox" name="categories" value="best_practices" checked>
+              <span class="checkbox-label" data-i18n="bestPractices">Best Practices</span>
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" name="categories" value="performance" checked>
+              <span class="checkbox-label" data-i18n="performance">Performance</span>
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" name="categories" value="security">
+              <span class="checkbox-label" data-i18n="security">Security</span>
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" name="categories" value="naming">
+              <span class="checkbox-label" data-i18n="naming">Naming Conventions</span>
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" name="categories" value="clean_core">
+              <span class="checkbox-label" data-i18n="cleanCore">Clean Core</span>
+            </label>
+          </div>
+        </section>
+
+        <div class="form-actions">
+          <button type="submit" id="submitBtn" class="btn-submit">
+            <span class="btn-text" data-i18n="runReview">Review starten</span>
+            <span class="btn-loader" aria-hidden="true"></span>
+          </button>
+        </div>
+      </form>
+    </aside>
+
+    <!-- RIGHT: Results -->
+    <section class="panel-right" id="resultsPanel">
+      <div id="placeholder" class="placeholder-state">
+        <div class="placeholder-icon"><svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="8" y="4" width="32" height="40" rx="3" stroke="currentColor" stroke-width="2" fill="none"/><line x1="14" y1="16" x2="34" y2="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="14" y1="22" x2="34" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="14" y1="28" x2="28" y2="28" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><rect x="13" y="33" width="4" height="4" rx="1" fill="currentColor" opacity="0.5"/><rect x="20" y="33" width="4" height="4" rx="1" fill="currentColor" opacity="0.5"/><rect x="27" y="33" width="4" height="4" rx="1" fill="currentColor" opacity="0.5"/></svg></div>
+        <h2 data-i18n="startReview">Review starten</h2>
+        <p data-i18n="startReviewDesc">Fuegen Sie ABAP-Code, eine CDS-View oder ein UI5-Artefakt ein und klicken Sie auf &laquo;Review starten&raquo;, um strukturierte Pruefergebnisse zu erhalten.</p>
+      </div>
+
+      <div id="errorState" class="error-state" hidden>
+        <div class="error-icon">!</div>
+        <h2 data-i18n="reviewError">Fehler beim Review</h2>
+        <p id="errorMessage"></p>
+        <button type="button" class="btn-retry" data-i18n="close" onclick="document.getElementById('errorState').hidden=true;document.getElementById('placeholder').hidden=false;">Schliessen</button>
+      </div>
+
+      <div id="resultsContainer" class="results-container" hidden>
+        <!-- Findings will be rendered here by app.js -->
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
