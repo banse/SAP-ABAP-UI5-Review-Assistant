@@ -148,7 +148,13 @@
       // GoNoGo
       goLabel: "GO",
       conditionalGoLabel: "CONDITIONAL GO",
-      noGoLabel: "NO GO"
+      noGoLabel: "NO GO",
+
+      // Open Questions inline answers
+      "oq.answerPlaceholder": "Ihre Antwort...",
+      "oq.answerAriaPrefix": "Antwort fuer: ",
+      "oq.regenerateBtn": "Review mit Antworten erneut ausfuehren",
+      "oq.answeredCount": "{n} beantwortet"
     },
     en: {
       // Header
@@ -289,11 +295,19 @@
       // GoNoGo
       goLabel: "GO",
       conditionalGoLabel: "CONDITIONAL GO",
-      noGoLabel: "NO GO"
+      noGoLabel: "NO GO",
+
+      // Open Questions inline answers
+      "oq.answerPlaceholder": "Your answer...",
+      "oq.answerAriaPrefix": "Answer for: ",
+      "oq.regenerateBtn": "Re-run Review with Answers",
+      "oq.answeredCount": "{n} answered"
     }
   };
 
   var currentLang = "de";
+  var clarifications = {};
+  var lastPayload = null;
 
   function t(key) {
     var dict = TRANSLATIONS[currentLang] || TRANSLATIONS.de;
@@ -585,7 +599,10 @@
 
     if (!validateForm()) return;
 
+    // Reset clarifications on new review
+    clarifications = {};
     var payload = buildPayload();
+    lastPayload = payload;
 
     // UI: loading state
     submitBtn.classList.add("is-loading");
@@ -795,10 +812,83 @@
     body.appendChild(container);
   }
 
-  // --- Open Questions ---
+  // --- Open Questions (with inline answer inputs) ---
+  function updateRegenerateButton() {
+    var btn = document.getElementById("btnRegenerate");
+    if (!btn) return;
+    var hasAny = Object.keys(clarifications).some(function (key) {
+      return clarifications[key] && clarifications[key].trim() !== "";
+    });
+    btn.hidden = !hasAny;
+  }
+
+  function handleRegenerate(btn) {
+    if (!lastPayload) return;
+
+    // Collect non-empty clarifications
+    var filledClarifications = {};
+    Object.keys(clarifications).forEach(function (key) {
+      if (clarifications[key] && clarifications[key].trim() !== "") {
+        filledClarifications[key] = clarifications[key].trim();
+      }
+    });
+
+    if (Object.keys(filledClarifications).length === 0) return;
+
+    // Build payload with clarifications
+    var payload = {};
+    Object.keys(lastPayload).forEach(function (k) {
+      payload[k] = lastPayload[k];
+    });
+    payload.clarifications = filledClarifications;
+    payload.language = currentLang.toUpperCase();
+
+    // Show loading state on re-generate button
+    btn.classList.add("is-loading");
+    btn.disabled = true;
+
+    fetch("/api/review", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    })
+      .then(function (resp) {
+        if (!resp.ok) {
+          return resp.json().catch(function () { return {}; }).then(function (body) {
+            throw new Error(body.detail || body.message || "HTTP " + resp.status);
+          });
+        }
+        return resp.json();
+      })
+      .then(function (data) {
+        renderResults(data);
+        resultsContainer.hidden = false;
+
+        // Ensure open questions card is expanded after re-generate
+        var oqHeader = document.querySelector('#cardOpenQuestions .result-card-header');
+        var oqBody = document.getElementById("cardOpenQuestionsBody");
+        if (oqHeader && oqBody && oqBody.hidden) {
+          oqBody.hidden = false;
+          oqHeader.setAttribute("aria-expanded", "true");
+        }
+      })
+      .catch(function (err) {
+        errorMessage.textContent = err.message || t("unknownError");
+        errorState.hidden = false;
+      })
+      .finally(function () {
+        btn.classList.remove("is-loading");
+        btn.disabled = false;
+      });
+  }
+
   function renderOpenQuestions(questions) {
     var body = document.getElementById("cardOpenQuestionsBody");
     body.innerHTML = "";
+
+    // Remove old re-generate button if present
+    var oldRegenBtn = document.getElementById("btnRegenerate");
+    if (oldRegenBtn) oldRegenBtn.parentNode.removeChild(oldRegenBtn);
 
     if (questions.length === 0) {
       body.innerHTML = '<p class="result-empty-hint">' + escapeHtml(t("noOpenQuestions")) + '</p>';
@@ -809,19 +899,72 @@
     container.className = "questions-list";
 
     questions.forEach(function (q) {
+      var questionKey = q.question || "";
       var item = document.createElement("div");
       item.className = "question-item";
-      item.innerHTML = '<div class="question-text">' + escapeHtml(q.question) + '</div>' +
-        '<div class="question-why">' + escapeHtml(t("whyItMatters")) + ': ' + escapeHtml(q.why_it_matters || "") + '</div>';
 
-      if (q.default_assumption) {
-        item.innerHTML += '<div class="question-default">' + escapeHtml(t("defaultAssumption")) + ': ' + escapeHtml(q.default_assumption) + '</div>';
+      // Apply has-answer class if a clarification already exists
+      if (clarifications[questionKey] && clarifications[questionKey].trim() !== "") {
+        item.classList.add("has-answer");
       }
 
+      var questionText = document.createElement("div");
+      questionText.className = "question-text";
+      questionText.textContent = questionKey;
+      item.appendChild(questionText);
+
+      var questionWhy = document.createElement("div");
+      questionWhy.className = "question-why";
+      questionWhy.textContent = t("whyItMatters") + ': ' + (q.why_it_matters || "");
+      item.appendChild(questionWhy);
+
+      if (q.default_assumption) {
+        var questionDefault = document.createElement("div");
+        questionDefault.className = "question-default";
+        questionDefault.textContent = t("defaultAssumption") + ': ' + q.default_assumption;
+        item.appendChild(questionDefault);
+      }
+
+      // Inline answer input
+      var answerInput = document.createElement("input");
+      answerInput.type = "text";
+      answerInput.className = "question-answer-input";
+      answerInput.placeholder = t("oq.answerPlaceholder");
+      answerInput.setAttribute("aria-label", t("oq.answerAriaPrefix") + questionKey);
+      answerInput.value = clarifications[questionKey] || "";
+      answerInput.addEventListener("input", function () {
+        clarifications[questionKey] = answerInput.value;
+        if (answerInput.value.trim() !== "") {
+          item.classList.add("has-answer");
+        } else {
+          item.classList.remove("has-answer");
+        }
+        updateRegenerateButton();
+      });
+
+      item.appendChild(answerInput);
       container.appendChild(item);
     });
 
     body.appendChild(container);
+
+    // Add re-generate button after the list
+    var regenBtn = document.createElement("button");
+    regenBtn.type = "button";
+    regenBtn.id = "btnRegenerate";
+    regenBtn.className = "btn-regenerate";
+    regenBtn.innerHTML = '<span class="btn-regenerate-text">' + escapeHtml(t("oq.regenerateBtn")) + '</span><span class="btn-regenerate-loader" aria-hidden="true"></span>';
+    regenBtn.hidden = true;
+    regenBtn.addEventListener("click", function () {
+      handleRegenerate(regenBtn);
+    });
+    // Insert after question list, inside the card
+    var oqCard = document.getElementById("cardOpenQuestions");
+    if (oqCard) {
+      oqCard.appendChild(regenBtn);
+    }
+
+    updateRegenerateButton();
   }
 
   // --- Test Gaps ---
