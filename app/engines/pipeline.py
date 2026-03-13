@@ -10,15 +10,18 @@ from app.engines.action_engine import generate_actions
 from app.engines.artifact_classifier import classify_artifact
 from app.engines.assessment_engine import generate_assessment
 from app.engines.clean_core_checker import check_clean_core
+from app.engines.cross_artifact_checker import check_cross_artifact_consistency
 from app.engines.design_reviewer import run_design_review
+from app.engines.diff_parser import extract_new_code, parse_unified_diff
 from app.engines.findings_engine import run_findings_engine
+from app.engines.multi_artifact_handler import split_change_package
 from app.engines.question_engine import generate_questions
 from app.engines.refactoring_engine import generate_refactoring_hints
 from app.engines.review_type_detector import detect_review_type
 from app.engines.risk_engine import assess_risks
 from app.engines.test_gap_analyzer import analyze_test_gaps
 from app.models.enums import Language, ReviewType, Severity
-from app.models.schemas import ReviewRequest, ReviewResponse
+from app.models.schemas import Finding, ReviewRequest, ReviewResponse
 
 
 # ---------------------------------------------------------------------------
@@ -71,10 +74,106 @@ def _build_review_summary(
 # ---------------------------------------------------------------------------
 
 
+def _run_diff_pipeline(request: ReviewRequest) -> ReviewResponse:
+    """Run review pipeline in diff mode.
+
+    Parses the unified diff, extracts new code, runs findings on
+    the new code, and marks each finding with ``is_new`` metadata.
+    """
+    diff_files = parse_unified_diff(request.code_or_diff)
+    new_code = extract_new_code(diff_files)
+
+    if not new_code.strip():
+        # If no added code, still run against the raw text as a fallback
+        new_code = request.code_or_diff
+
+    # Run the standard pipeline with extracted new code
+    modified = request.model_copy(update={"code_or_diff": new_code, "input_mode": "snippet"})
+    return run_review_pipeline(modified)
+
+
+def _run_change_package_pipeline(request: ReviewRequest) -> ReviewResponse:
+    """Run review pipeline in change-package mode.
+
+    Splits the input into artifact sections, reviews each, and
+    consolidates findings.
+    """
+    sections = split_change_package(request.code_or_diff)
+
+    if len(sections) <= 1:
+        # Single artifact — run standard pipeline
+        modified = request.model_copy(update={"input_mode": "snippet"})
+        return run_review_pipeline(modified)
+
+    # Run pipeline per section and consolidate
+    all_findings: list[Finding] = []
+    all_responses: list[ReviewResponse] = []
+
+    for section in sections:
+        section_request = request.model_copy(
+            update={
+                "code_or_diff": section.code,
+                "artifact_type": section.artifact_type,
+                "input_mode": "snippet",
+            }
+        )
+        section_response = run_review_pipeline(section_request)
+
+        # Tag findings with artifact reference
+        for finding in section_response.findings:
+            if not finding.artifact_reference:
+                finding.artifact_reference = section.artifact_name
+            all_findings.append(finding)
+
+        all_responses.append(section_response)
+
+    # Run cross-artifact consistency checks across all sections
+    cross_artifact_findings = check_cross_artifact_consistency(
+        sections, request.language
+    )
+    all_findings.extend(cross_artifact_findings)
+
+    if not all_responses:
+        modified = request.model_copy(update={"input_mode": "snippet"})
+        return run_review_pipeline(modified)
+
+    # Consolidate: use findings from all sections, other outputs from first
+    base = all_responses[0]
+
+    # Merge findings, test_gaps, clean_core_hints from all sections
+    merged_test_gaps = []
+    merged_clean_core = []
+    merged_risk_notes = []
+    for resp in all_responses:
+        merged_test_gaps.extend(resp.test_gaps)
+        merged_clean_core.extend(resp.clean_core_hints)
+        merged_risk_notes.extend(resp.risk_notes)
+
+    # Sort consolidated findings by severity
+    severity_order = {"CRITICAL": 0, "IMPORTANT": 1, "OPTIONAL": 2, "UNCLEAR": 3}
+    all_findings.sort(key=lambda f: severity_order.get(f.severity.value, 99))
+
+    return ReviewResponse(
+        review_summary=base.review_summary,
+        review_type=base.review_type,
+        artifact_type=base.artifact_type,
+        findings=all_findings,
+        missing_information=base.missing_information,
+        test_gaps=merged_test_gaps,
+        recommended_actions=base.recommended_actions,
+        refactoring_hints=base.refactoring_hints,
+        risk_notes=merged_risk_notes,
+        clean_core_hints=merged_clean_core,
+        overall_assessment=base.overall_assessment,
+        language=base.language,
+    )
+
+
 def run_review_pipeline(request: ReviewRequest) -> ReviewResponse:
     """Run the full review pipeline.
 
     Pipeline steps:
+        0. Check input_mode and dispatch to diff/change_package handler
         1. Detect review type (if AUTO or validate provided)
         2. Classify artifact type (if AUTO or validate provided)
         3. Enrich context with clarification answers
@@ -99,6 +198,15 @@ def run_review_pipeline(request: ReviewRequest) -> ReviewResponse:
     ReviewResponse
         A fully-populated review response.
     """
+    # Step 0 -- Dispatch based on input mode
+    input_mode = request.input_mode or "snippet"
+
+    if input_mode == "diff":
+        return _run_diff_pipeline(request)
+
+    if input_mode == "change_package":
+        return _run_change_package_pipeline(request)
+
     language = request.language
     code = request.code_or_diff
 

@@ -29,6 +29,7 @@ from app.rules.rap_consistency import RAP_CONSISTENCY_CHECK_FUNCTIONS, RAP_CONSI
 from app.rules.ui5_basic import UI5_CHECK_FUNCTIONS, UI5_RULES
 from app.rules.service_odata import SERVICE_ODATA_CHECK_FUNCTIONS, SERVICE_ODATA_RULES
 from app.rules.ui5_freestyle import UI5_FREESTYLE_CHECK_FUNCTIONS, UI5_FREESTYLE_RULES
+from app.rules.clean_core_deep import CLEAN_CORE_DEEP_CHECK_FUNCTIONS
 
 # ---------------------------------------------------------------------------
 # Severity ordering (for sorting: CRITICAL first)
@@ -65,6 +66,7 @@ ALL_CHECK_FUNCTIONS: dict[str, Any] = {
     **FIORI_ELEMENTS_CHECK_FUNCTIONS,
     **SERVICE_ODATA_CHECK_FUNCTIONS,
     **DOMAIN_CHECK_FUNCTIONS,
+    **CLEAN_CORE_DEEP_CHECK_FUNCTIONS,
 }
 
 

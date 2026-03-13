@@ -41,6 +41,7 @@ class ReviewRequest(BaseModel):
     review_type: ReviewType
     artifact_type: ArtifactType
     code_or_diff: str = Field(min_length=1)
+    input_mode: str = "snippet"  # "snippet", "diff", or "change_package"
     context_summary: str = ""
     review_context: ReviewContext = ReviewContext.GREENFIELD
     goal_of_review: str = ""
@@ -69,6 +70,14 @@ class Finding(BaseModel):
     artifact_reference: str | None = None
     line_reference: str | None = None
     rule_id: str | None = None
+
+
+class DiffFinding(BaseModel):
+    """A finding with diff context — indicates whether it is new or pre-existing."""
+
+    finding: Finding
+    is_new: bool = True  # True if finding is in added code, False if pre-existing
+    diff_context: str = ""  # The diff hunk containing this finding
 
 
 class TestGap(BaseModel):
@@ -142,6 +151,23 @@ class OverallAssessment(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class FindingResolutionRequest(BaseModel):
+    """Request body for setting a finding resolution status."""
+
+    status: str  # OPEN, ACCEPTED, REJECTED, DEFERRED, FIXED
+    reviewer_name: str = ""
+    comment: str = ""
+
+
+class ReviewCompletion(BaseModel):
+    """Completion metrics for a review."""
+
+    total_findings: int = 0
+    resolved: int = 0
+    completion_pct: float = 0.0
+    by_status: dict = Field(default_factory=dict)
+
+
 class ReviewResponse(BaseModel):
     """Complete review output returned to the caller."""
 
@@ -157,3 +183,21 @@ class ReviewResponse(BaseModel):
     clean_core_hints: list[CleanCoreHint] = Field(default_factory=list)
     overall_assessment: OverallAssessment
     language: Language = Language.EN
+    similar_reviews: list[dict] = Field(default_factory=list)
+    recurring_patterns: list[dict] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Quality Gate Config (for API requests)
+# ---------------------------------------------------------------------------
+
+
+class QualityGateConfig(BaseModel):
+    """Configuration for CI quality gate thresholds."""
+
+    max_critical: int = 0
+    max_important: int = -1
+    max_total: int = -1
+    require_go: bool = False
+    require_clean_core: bool = False
+    custom_blocked_rules: list[str] = Field(default_factory=list)

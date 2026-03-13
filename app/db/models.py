@@ -5,6 +5,8 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
+from typing import Optional
+
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -103,6 +105,11 @@ class ReviewHistoryRecord(Base):
         back_populates="review",
         cascade="all, delete-orphan",
     )
+    resolutions: Mapped[list["FindingResolution"]] = relationship(  # type: ignore[type-arg]
+        "FindingResolution",
+        back_populates="review",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:
         return (
@@ -163,4 +170,69 @@ class FindingFeedback(Base):
             f"review_id={self.review_id} "
             f"finding_index={self.finding_index} "
             f"helpful={self.helpful}>"
+        )
+
+
+class FindingResolution(Base):
+    """Stores per-finding resolution status for team review workflows."""
+
+    __tablename__ = "finding_resolutions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
+    review_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("review_history.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    finding_index: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+    rule_id: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    status: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="OPEN",
+    )
+    reviewer_name: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    comment: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        server_default=text("now()"),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        server_default=text("now()"),
+        nullable=False,
+    )
+
+    review: Mapped[ReviewHistoryRecord] = relationship(
+        "ReviewHistoryRecord",
+        back_populates="resolutions",
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<FindingResolution id={self.id} "
+            f"review_id={self.review_id} "
+            f"finding_index={self.finding_index} "
+            f"status={self.status}>"
         )

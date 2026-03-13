@@ -11,6 +11,16 @@ import re
 from app.models.enums import ArtifactType, Language, Severity
 from app.models.schemas import CleanCoreHint
 from app.rules.clean_core_rules import CLEAN_CORE_RULES, CleanCoreRule
+from app.rules.clean_core_deep import (
+    CLEAN_CORE_DEEP_CHECK_FUNCTIONS,
+    CLEAN_CORE_DEEP_RULES,
+)
+
+# ---------------------------------------------------------------------------
+# Combined rule set: original CC-API rules + deep CC-DEEP rules
+# ---------------------------------------------------------------------------
+
+_ALL_CLEAN_CORE_RULES: tuple[CleanCoreRule, ...] = CLEAN_CORE_RULES + CLEAN_CORE_DEEP_RULES
 
 # ---------------------------------------------------------------------------
 # Severity ordering (for sorting: CRITICAL first)
@@ -47,6 +57,12 @@ def _run_clean_core_rule(
     hints: list[CleanCoreHint] = []
     is_de = language == Language.DE
 
+    # -------------------------------------------------------------------
+    # Custom check function path (pattern == "__CUSTOM_CHECK__")
+    # -------------------------------------------------------------------
+    if rule.pattern == "__CUSTOM_CHECK__":
+        return _run_custom_clean_core_check(rule, code, language)
+
     try:
         compiled = re.compile(rule.pattern, rule.pattern_flags)
     except re.error:
@@ -72,6 +88,53 @@ def _run_clean_core_rule(
             severity=Severity(rule.severity),
         )
     )
+
+    return hints
+
+
+def _run_custom_clean_core_check(
+    rule: CleanCoreRule,
+    code: str,
+    language: Language,
+) -> list[CleanCoreHint]:
+    """Run a custom check function for a deep clean-core rule."""
+    hints: list[CleanCoreHint] = []
+    is_de = language == Language.DE
+
+    # Map rule IDs to their custom check functions
+    _RULE_TO_FN: dict[str, str] = {
+        "CC-DEEP-005": "check_sap_table_access",
+        "CC-DEEP-014": "check_missing_event_pattern",
+    }
+
+    fn_name = _RULE_TO_FN.get(rule.rule_id)
+    if fn_name is None:
+        return hints
+
+    fn = CLEAN_CORE_DEEP_CHECK_FUNCTIONS.get(fn_name)
+    if fn is None:
+        return hints
+
+    try:
+        results: list[tuple[str, int]] = fn(code)
+    except Exception:
+        return hints
+
+    for matched_text, _line_num in results:
+        if len(matched_text) > 80:
+            matched_text = matched_text[:77] + "..."
+
+        template = rule.finding_template_de if is_de else rule.finding_template
+        finding_text = template.replace("{match}", matched_text)
+
+        hints.append(
+            CleanCoreHint(
+                finding=finding_text,
+                released_api_alternative=rule.released_api_alternative,
+                severity=Severity(rule.severity),
+            )
+        )
+        break  # Only first occurrence
 
     return hints
 
@@ -112,7 +175,7 @@ def check_clean_core(
     all_hints: list[CleanCoreHint] = []
     seen_rule_ids: set[str] = set()
 
-    for rule in CLEAN_CORE_RULES:
+    for rule in _ALL_CLEAN_CORE_RULES:
         if rule.rule_id in seen_rule_ids:
             continue
 

@@ -9,6 +9,48 @@ from __future__ import annotations
 from typing import Any
 
 
+def _resolution_label(finding_index: int, resolutions: list[dict]) -> str:
+    """Build a resolution label string for a finding, e.g. '[ACCEPTED]' or '[DEFERRED by John: reason]'."""
+    for r in resolutions:
+        if r.get("finding_index") == finding_index and r.get("status", "OPEN") != "OPEN":
+            status = r["status"]
+            parts = [status]
+            if r.get("reviewer_name"):
+                parts.append(f"by {r['reviewer_name']}")
+            if r.get("comment"):
+                parts.append(r["comment"])
+            return "[" + " ".join(parts) + "] " if len(parts) == 1 else "[" + parts[0] + " " + ": ".join(parts[1:]) + "] "
+    return ""
+
+
+def _completion_summary(resolutions: list[dict], total_findings: int, is_de: bool) -> list[str]:
+    """Generate a completion summary block."""
+    if not resolutions and total_findings == 0:
+        return []
+
+    lines: list[str] = []
+    by_status: dict[str, int] = {}
+    resolved = 0
+    for r in resolutions:
+        st = r.get("status", "OPEN")
+        by_status[st] = by_status.get(st, 0) + 1
+        if st != "OPEN":
+            resolved += 1
+
+    pct = (resolved / total_findings * 100.0) if total_findings > 0 else 0.0
+    lines.append("## " + ("Abschluss-Status" if is_de else "Completion Status"))
+    lines.append("")
+    lines.append(
+        f"{'Fortschritt' if is_de else 'Progress'}: {resolved}/{total_findings} ({pct:.0f}%)"
+    )
+
+    if by_status:
+        status_parts = [f"{k}: {v}" for k, v in sorted(by_status.items())]
+        lines.append(" | ".join(status_parts))
+    lines.append("")
+    return lines
+
+
 def format_as_markdown(response: dict, language: str = "EN") -> str:
     """Generate a full structured Markdown review document.
 
@@ -78,6 +120,7 @@ def format_as_markdown(response: dict, language: str = "EN") -> str:
 
     # Findings
     findings = response.get("findings") or []
+    resolutions = response.get("resolutions") or []
     if findings:
         lines.append("## " + ("Befunde" if is_de else "Findings"))
         lines.append("")
@@ -90,7 +133,8 @@ def format_as_markdown(response: dict, language: str = "EN") -> str:
 
         for i, f in enumerate(findings, 1):
             sev = f.get("severity", "UNCLEAR")
-            title = (f.get("title") or "").replace("|", "\\|")
+            res_label = _resolution_label(i - 1, resolutions)
+            title = (res_label + (f.get("title") or "")).replace("|", "\\|")
             rec = (f.get("recommendation") or "").replace("|", "\\|")
             if len(rec) > 120:
                 rec = rec[:117] + "..."
@@ -101,7 +145,8 @@ def format_as_markdown(response: dict, language: str = "EN") -> str:
         for i, f in enumerate(findings, 1):
             sev = f.get("severity", "UNCLEAR")
             title = f.get("title", "")
-            lines.append(f"### {i}. [{sev}] {title}")
+            res_label = _resolution_label(i - 1, resolutions)
+            lines.append(f"### {i}. [{sev}] {res_label}{title}")
             lines.append("")
             if f.get("observation"):
                 lines.append(f"**{('Beobachtung' if is_de else 'Observation')}:** {f['observation']}")
@@ -207,6 +252,11 @@ def format_as_markdown(response: dict, language: str = "EN") -> str:
                 lines.append(f"  - {label}: {info['default_assumption']}")
         lines.append("")
 
+    # Completion summary (when resolutions are present)
+    if resolutions:
+        total = len(findings)
+        lines.extend(_completion_summary(resolutions, total, is_de))
+
     return "\n".join(lines)
 
 
@@ -247,15 +297,17 @@ def format_as_ticket_comment(response: dict, language: str = "EN") -> str:
 
     # Top findings (max 5)
     findings = response.get("findings") or []
+    resolutions = response.get("resolutions") or []
     if findings:
         lines.append(("Befunde:" if is_de else "Findings:"))
-        for f in findings[:5]:
+        for idx, f in enumerate(findings[:5]):
             sev = f.get("severity", "UNCLEAR")
             title = f.get("title", "")
+            res_label = _resolution_label(idx, resolutions)
             rec = f.get("recommendation", "")
             if len(rec) > 80:
                 rec = rec[:77] + "..."
-            lines.append(f"- [{sev}] {title}")
+            lines.append(f"- [{sev}] {res_label}{title}")
             if rec:
                 lines.append(f"  -> {rec}")
         if len(findings) > 5:
@@ -271,6 +323,11 @@ def format_as_ticket_comment(response: dict, language: str = "EN") -> str:
             title = a.get("title", "")
             lines.append(f"- {title}")
         lines.append("")
+
+    # Completion summary
+    if resolutions:
+        total = len(findings)
+        lines.extend(_completion_summary(resolutions, total, is_de))
 
     return "\n".join(lines)
 
@@ -313,12 +370,14 @@ def format_as_clipboard(response: dict, language: str = "EN") -> str:
 
     # Findings as bullets
     findings = response.get("findings") or []
+    resolutions = response.get("resolutions") or []
     if findings:
         lines.append(("Befunde:" if is_de else "Findings:"))
-        for f in findings:
+        for idx, f in enumerate(findings):
             sev = f.get("severity", "UNCLEAR")
             title = f.get("title", "")
-            lines.append(f"  [{sev}] {title}")
+            res_label = _resolution_label(idx, resolutions)
+            lines.append(f"  [{sev}] {res_label}{title}")
         lines.append("")
 
     # Action items
@@ -330,5 +389,10 @@ def format_as_clipboard(response: dict, language: str = "EN") -> str:
             title = a.get("title", "")
             lines.append(f"  {order}. {title}")
         lines.append("")
+
+    # Completion summary
+    if resolutions:
+        total = len(findings)
+        lines.extend(_completion_summary(resolutions, total, is_de))
 
     return "\n".join(lines)

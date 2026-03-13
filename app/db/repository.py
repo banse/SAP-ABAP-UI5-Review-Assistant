@@ -8,7 +8,7 @@ import uuid
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import FindingFeedback, ReviewHistoryRecord, ReviewRecord
+from app.db.models import FindingFeedback, FindingResolution, ReviewHistoryRecord, ReviewRecord
 
 logger = logging.getLogger(__name__)
 
@@ -288,3 +288,157 @@ async def get_feedback_for_review(
     except Exception:
         logger.warning("Failed to get feedback for review", exc_info=True)
         return []
+
+
+# ---------------------------------------------------------------------------
+# Finding Resolution helpers
+# ---------------------------------------------------------------------------
+
+VALID_RESOLUTION_STATUSES = {"OPEN", "ACCEPTED", "REJECTED", "DEFERRED", "FIXED"}
+
+
+async def set_finding_resolution(
+    session: AsyncSession | None,
+    *,
+    review_id: str,
+    finding_index: int,
+    status: str,
+    reviewer_name: str = "",
+    comment: str = "",
+    rule_id: str | None = None,
+) -> dict | None:
+    """Set or update a finding resolution. Returns the resolution dict or None."""
+    if session is None:
+        return None
+    try:
+        uid = uuid.UUID(review_id)
+        # Verify the review exists
+        review = await session.get(ReviewHistoryRecord, uid)
+        if review is None:
+            return None
+
+        # Check for existing resolution on this finding
+        stmt = (
+            select(FindingResolution)
+            .where(FindingResolution.review_id == uid)
+            .where(FindingResolution.finding_index == finding_index)
+        )
+        existing = (await session.execute(stmt)).scalar_one_or_none()
+
+        if existing:
+            existing.status = status
+            existing.reviewer_name = reviewer_name or existing.reviewer_name
+            existing.comment = comment if comment else existing.comment
+            if rule_id is not None:
+                existing.rule_id = rule_id
+            from datetime import datetime as dt, timezone as tz
+            existing.updated_at = dt.now(tz.utc)
+            await session.commit()
+            await session.refresh(existing)
+            resolution = existing
+        else:
+            resolution = FindingResolution(
+                review_id=uid,
+                finding_index=finding_index,
+                rule_id=rule_id,
+                status=status,
+                reviewer_name=reviewer_name,
+                comment=comment,
+            )
+            session.add(resolution)
+            await session.commit()
+            await session.refresh(resolution)
+
+        return {
+            "id": str(resolution.id),
+            "review_id": str(resolution.review_id),
+            "finding_index": resolution.finding_index,
+            "rule_id": resolution.rule_id,
+            "status": resolution.status,
+            "reviewer_name": resolution.reviewer_name,
+            "comment": resolution.comment,
+            "created_at": resolution.created_at.isoformat(),
+            "updated_at": resolution.updated_at.isoformat(),
+        }
+    except Exception:
+        logger.warning("Failed to set finding resolution", exc_info=True)
+        return None
+
+
+async def get_resolutions_for_review(
+    session: AsyncSession | None,
+    review_id: str,
+) -> list[dict]:
+    """Return all resolution entries for a review."""
+    if session is None:
+        return []
+    try:
+        uid = uuid.UUID(review_id)
+        stmt = (
+            select(FindingResolution)
+            .where(FindingResolution.review_id == uid)
+            .order_by(FindingResolution.finding_index)
+        )
+        rows = (await session.execute(stmt)).scalars().all()
+        return [
+            {
+                "id": str(r.id),
+                "review_id": str(r.review_id),
+                "finding_index": r.finding_index,
+                "rule_id": r.rule_id,
+                "status": r.status,
+                "reviewer_name": r.reviewer_name,
+                "comment": r.comment,
+                "created_at": r.created_at.isoformat(),
+                "updated_at": r.updated_at.isoformat(),
+            }
+            for r in rows
+        ]
+    except Exception:
+        logger.warning("Failed to get resolutions for review", exc_info=True)
+        return []
+
+
+async def get_review_completion(
+    session: AsyncSession | None,
+    review_id: str,
+) -> dict | None:
+    """Return completion metrics for a review.
+
+    Returns {total_findings, resolved, completion_pct, by_status: {...}} or None.
+    """
+    if session is None:
+        return None
+    try:
+        uid = uuid.UUID(review_id)
+        review = await session.get(ReviewHistoryRecord, uid)
+        if review is None:
+            return None
+
+        total_findings = review.finding_count
+
+        # Get resolutions
+        stmt = (
+            select(FindingResolution)
+            .where(FindingResolution.review_id == uid)
+        )
+        rows = (await session.execute(stmt)).scalars().all()
+
+        by_status: dict[str, int] = {}
+        resolved = 0
+        for r in rows:
+            by_status[r.status] = by_status.get(r.status, 0) + 1
+            if r.status != "OPEN":
+                resolved += 1
+
+        completion_pct = (resolved / total_findings * 100.0) if total_findings > 0 else 0.0
+
+        return {
+            "total_findings": total_findings,
+            "resolved": resolved,
+            "completion_pct": round(completion_pct, 1),
+            "by_status": by_status,
+        }
+    except Exception:
+        logger.warning("Failed to get review completion", exc_info=True)
+        return None

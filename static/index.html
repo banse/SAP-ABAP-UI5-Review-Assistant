@@ -10,6 +10,9 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+  <!-- Skip to content (accessibility) -->
+  <a href="#resultsPanel" class="skip-link">Skip to results</a>
+
   <!-- Header -->
   <header class="app-header">
     <div class="header-brand">
@@ -33,6 +36,9 @@
     </div>
     <div class="header-actions">
       <span class="version-badge">v0.1.0 MVP</span>
+      <button class="statistics-toggle" id="statisticsToggle" type="button" aria-label="Statistics" title="Statistics" data-i18n-title="statisticsToggleTitle" hidden>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="18" y="3" width="4" height="18"/><rect x="10" y="8" width="4" height="13"/><rect x="2" y="13" width="4" height="8"/></svg>
+      </button>
       <button class="history-toggle" id="historyToggle" type="button" aria-label="Toggle history panel" title="Toggle history panel" data-i18n-title="historyToggleTitle" hidden>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       </button>
@@ -122,6 +128,11 @@
             <span data-i18n="codeInput">Code / Diff</span>
             <span class="required-star">*</span>
           </label>
+          <div class="input-mode-tabs" id="inputModeTabs" role="tablist" aria-label="Input mode">
+            <button type="button" class="input-tab active" data-mode="snippet" data-i18n="inputSnippet" role="tab" aria-selected="true" aria-controls="codeInput" id="tab-snippet">Code Snippet</button>
+            <button type="button" class="input-tab" data-mode="diff" data-i18n="inputDiff" role="tab" aria-selected="false" aria-controls="codeInput" id="tab-diff">Git Diff</button>
+            <button type="button" class="input-tab" data-mode="change_package" data-i18n="inputChangePackage" role="tab" aria-selected="false" aria-controls="codeInput" id="tab-change-package">Change Package</button>
+          </div>
           <textarea
             id="codeInput"
             name="code_or_diff"
@@ -130,6 +141,8 @@
             data-i18n-placeholder="codeInputPlaceholder"
             placeholder="CLASS zcl_example DEFINITION PUBLIC FINAL CREATE PUBLIC.&#10;  PUBLIC SECTION.&#10;    METHODS get_data RETURNING VALUE(rt_data) TYPE tt_data.&#10;ENDCLASS.&#10;&#10;CLASS zcl_example IMPLEMENTATION.&#10;  METHOD get_data.&#10;    SELECT * FROM ztable INTO TABLE @rt_data.&#10;  ENDMETHOD.&#10;ENDCLASS."
             required
+            role="tabpanel"
+            aria-label="Code input area"
           ></textarea>
         </section>
 
@@ -340,22 +353,49 @@
       </div>
 
       <!-- Results Container -->
-      <div id="resultsContainer" class="results-container" hidden>
+      <div id="resultsContainer" class="results-container" aria-live="polite" hidden>
 
         <!-- Export Actions -->
         <div class="export-actions" id="exportActions">
-          <button type="button" class="btn-export" id="btnExportMarkdown" data-i18n="exportMarkdown">
+          <button type="button" class="btn-export" id="btnExportMarkdown" data-i18n="exportMarkdown" aria-label="Export as Markdown file">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Export Markdown
           </button>
-          <button type="button" class="btn-export" id="btnCopyTicket" data-i18n="copyTicketComment">
+          <button type="button" class="btn-export" id="btnCopyTicket" data-i18n="copyTicketComment" aria-label="Copy as ticket comment">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
             Copy as Ticket Comment
           </button>
-          <button type="button" class="btn-export" id="btnCopyClipboard" data-i18n="copyClipboard">
+          <button type="button" class="btn-export" id="btnCopyClipboard" data-i18n="copyClipboard" aria-label="Copy to clipboard">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
             Copy to Clipboard
           </button>
+          <button type="button" class="btn-export btn-export-sarif" id="btnExportSarif" data-i18n="exportSarif" aria-label="Export as SARIF file">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            Export SARIF
+          </button>
+          <button type="button" class="btn-export btn-export-ci" id="btnExportCiJson" data-i18n="exportCiJson" aria-label="Export as CI JSON file">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            Export CI JSON
+          </button>
+          <button type="button" class="btn-export share-btn" id="btnShareReview" data-i18n="shareReview" aria-label="Share review link" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            Share Review
+          </button>
+        </div>
+
+        <!-- Reviewer Name & Completion Bar (team workflows) -->
+        <div class="team-workflow-bar" id="teamWorkflowBar" hidden>
+          <div class="reviewer-name-section">
+            <label class="reviewer-name-label" for="reviewerNameInput" data-i18n="reviewerName">Reviewer</label>
+            <input type="text" id="reviewerNameInput" class="reviewer-name-input" data-i18n-placeholder="reviewerNamePlaceholder" placeholder="Ihr Name / Your name">
+          </div>
+          <div class="completion-section" id="completionSection">
+            <span class="completion-label" id="completionLabel" data-i18n="completionProgress">Fortschritt</span>
+            <div class="completion-bar" id="completionBar">
+              <div class="completion-bar-fill" id="completionBarFill" style="width:0%"></div>
+            </div>
+            <span class="completion-pct" id="completionPct">0%</span>
+          </div>
         </div>
 
         <!-- 1. Overall Assessment -->
@@ -439,6 +479,17 @@
           <div class="result-card-body" id="cardCleanCoreHintsBody" hidden></div>
         </article>
 
+        <!-- 10. Similar Past Reviews -->
+        <article class="result-card" id="cardSimilarReviews" style="display:none;">
+          <button type="button" class="result-card-header" aria-expanded="false" data-target="cardSimilarReviewsBody">
+            <h2 class="result-card-title" data-i18n="resSimilarReviews">Aehnliche vergangene Reviews</h2>
+            <svg class="result-card-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="result-card-body" id="cardSimilarReviewsBody" hidden>
+            <div id="similarReviewsList"></div>
+          </div>
+        </article>
+
       </div>
     </section>
 
@@ -458,6 +509,21 @@
       </div>
     </aside>
   </main>
+
+  <!-- Statistics Modal -->
+  <div class="statistics-modal-overlay" id="statisticsModal" hidden>
+    <div class="statistics-modal" role="dialog" aria-labelledby="statisticsModalTitle" aria-modal="true">
+      <div class="statistics-modal-header">
+        <h2 id="statisticsModalTitle" data-i18n="statisticsTitle">Review-Statistiken</h2>
+        <button type="button" class="statistics-modal-close" id="statisticsModalClose" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="statistics-modal-body" id="statisticsModalBody">
+        <p data-i18n="statisticsLoading">Lade Statistiken...</p>
+      </div>
+    </div>
+  </div>
 
   <!-- Screen Reader Live Region -->
   <div id="ariaLiveRegion" class="sr-only" aria-live="polite" aria-atomic="true"></div>
