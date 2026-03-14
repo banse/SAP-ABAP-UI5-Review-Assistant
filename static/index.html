@@ -416,16 +416,7 @@
           <div class="result-card-body" id="cardReviewSummaryBody"></div>
         </article>
 
-        <!-- 3. Findings -->
-        <article class="result-card" id="cardFindings">
-          <button type="button" class="result-card-header" aria-expanded="true" data-target="cardFindingsBody">
-            <h2 class="result-card-title" data-i18n="resFindings">Befunde</h2>
-            <svg class="result-card-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-          </button>
-          <div class="result-card-body" id="cardFindingsBody"></div>
-        </article>
-
-        <!-- 4. Open Questions -->
+        <!-- 3. Open Questions -->
         <article class="result-card" id="cardOpenQuestions">
           <button type="button" class="result-card-header" aria-expanded="false" data-target="cardOpenQuestionsBody">
             <h2 class="result-card-title" data-i18n="resOpenQuestions">Offene Fragen</h2>
@@ -434,7 +425,34 @@
           <div class="result-card-body" id="cardOpenQuestionsBody" hidden></div>
         </article>
 
-        <!-- 5. Test Gaps -->
+        <!-- 4. Risk Dashboard -->
+        <article class="result-card" id="cardRiskDashboard">
+          <button type="button" class="result-card-header" aria-expanded="true" data-target="cardRiskDashboardBody">
+            <h2 class="result-card-title" data-i18n="resRiskDashboard">Risiko-Dashboard</h2>
+            <svg class="result-card-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="result-card-body" id="cardRiskDashboardBody"></div>
+        </article>
+
+        <!-- 5. Refactoring Hints -->
+        <article class="result-card" id="cardRefactoringHints">
+          <button type="button" class="result-card-header" aria-expanded="true" data-target="cardRefactoringHintsBody">
+            <h2 class="result-card-title" data-i18n="resRefactoringHints">Refactoring-Hinweise</h2>
+            <svg class="result-card-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="result-card-body" id="cardRefactoringHintsBody"></div>
+        </article>
+
+        <!-- 6. Findings -->
+        <article class="result-card" id="cardFindings">
+          <button type="button" class="result-card-header" aria-expanded="false" data-target="cardFindingsBody">
+            <h2 class="result-card-title" data-i18n="resFindings">Befunde</h2>
+            <svg class="result-card-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="result-card-body" id="cardFindingsBody" hidden></div>
+        </article>
+
+        <!-- 7. Test Gaps -->
         <article class="result-card" id="cardTestGaps">
           <button type="button" class="result-card-header" aria-expanded="false" data-target="cardTestGapsBody">
             <h2 class="result-card-title" data-i18n="resTestGaps">Test-Luecken</h2>
@@ -443,31 +461,13 @@
           <div class="result-card-body" id="cardTestGapsBody" hidden></div>
         </article>
 
-        <!-- 6. Recommended Actions -->
+        <!-- 8. Recommended Actions -->
         <article class="result-card" id="cardRecommendedActions">
           <button type="button" class="result-card-header" aria-expanded="false" data-target="cardRecommendedActionsBody">
             <h2 class="result-card-title" data-i18n="resRecommendedActions">Empfohlene Massnahmen</h2>
             <svg class="result-card-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
           <div class="result-card-body" id="cardRecommendedActionsBody" hidden></div>
-        </article>
-
-        <!-- 7. Refactoring Hints -->
-        <article class="result-card" id="cardRefactoringHints">
-          <button type="button" class="result-card-header" aria-expanded="false" data-target="cardRefactoringHintsBody">
-            <h2 class="result-card-title" data-i18n="resRefactoringHints">Refactoring-Hinweise</h2>
-            <svg class="result-card-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-          </button>
-          <div class="result-card-body" id="cardRefactoringHintsBody" hidden></div>
-        </article>
-
-        <!-- 8. Risk Dashboard -->
-        <article class="result-card" id="cardRiskDashboard">
-          <button type="button" class="result-card-header" aria-expanded="false" data-target="cardRiskDashboardBody">
-            <h2 class="result-card-title" data-i18n="resRiskDashboard">Risiko-Dashboard</h2>
-            <svg class="result-card-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-          </button>
-          <div class="result-card-body" id="cardRiskDashboardBody" hidden></div>
         </article>
 
         <!-- 9. Clean-Core Hints -->

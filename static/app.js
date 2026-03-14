@@ -622,7 +622,8 @@
   }
 
   function initLanguage() {
-    var saved = localStorage.getItem("ra-lang");
+    var urlLang = new URLSearchParams(window.location.search).get("lang");
+    var saved = urlLang ? urlLang.toLowerCase() : localStorage.getItem("ra-lang");
     if (saved) applyLanguage(saved);
   }
 
@@ -986,8 +987,8 @@
 
     renderOverallAssessment(data.overall_assessment);
     renderReviewSummary(data.review_summary);
-    renderFindings(data.findings || []);
     renderOpenQuestions(data.missing_information || []);
+    renderFindings(data.findings || []);
     renderTestGaps(data.test_gaps || []);
     renderRecommendedActions(data.recommended_actions || []);
     renderRefactoringHints(data.refactoring_hints || []);
